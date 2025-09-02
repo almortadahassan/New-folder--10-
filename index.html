@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom scrollbar styling for slider */
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #22c55e;
+      cursor: pointer;
+      border-radius: 50%;
+      border: none;
+      box-shadow: 0 0 2px rgba(0,0,0,0.5);
+      transition: background 0.3s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #16a34a;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #e4e4e7;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="checkbox"] {
+      accent-color: #22c55e;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    /* Clipboard icon styling */
+    .clipboard-icon {
+      font-size: 1.2rem;
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen px-4">
+
+  <div class="max-w-sm w-full bg-gray-800 rounded-lg shadow-lg p-6 space-y-6" role="region" aria-label="Password Generator">
+    <h1 class="text-gray-300 text-center font-mono text-lg mb-1 select-none">Password Generator</h1>
+
+    <div id="passwordWrapper" 
+         class="relative bg-gray-900 rounded-md p-4 text-green-400 font-mono font-semibold text-base flex items-center justify-between select-all">
+      <span id="resultPassword" aria-live="polite" aria-atomic="true">
+        &nbsp;
+      </span>
+      <button id="clipboardBtn" aria-label="Copy password to clipboard" class="clipboard-icon text-green-400 hover:text-green-300 transition-colors duration-200" title="Copy to clipboard">
+        📋
+      </button>
+    </div>
+
+    <form id="passwordForm" class="bg-gray-900 rounded-md p-6 space-y-5" aria-label="Password options form">
+      
+      <div class="flex items-center justify-between text-gray-400 font-mono mb-2">
+        <label for="lengthSlider" class="select-none">Character Length</label>
+        <span id="lengthValue" aria-live="polite" aria-atomic="true" class="font-normal text-green-400">0</span>
+      </div>
+      <input 
+        type="range" 
+        id="lengthSlider" 
+        name="length" 
+        min="0" 
+        max="30" 
+        value="0"
+        aria-valuemin="0"
+        aria-valuemax="30"
+        aria-valuenow="0"
+        aria-describedby="lengthHelp"
+      />
+      <div id="lengthHelp" class="sr-only">Use the slider to choose password length from 0 to 30 characters</div>
+
+      <fieldset class="space-y-3 text-gray-300 font-mono text-sm" aria-describedby="optionDesc">
+        <legend class="sr-only">Password character type options</legend>
+        <label class="inline-flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="uppercase" name="uppercase" />
+          <span>Include Uppercase Letters</span>
+        </label>
+        <label class="inline-flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="lowercase" name="lowercase" />
+          <span>Include Lowercase Letters</span>
+        </label>
+        <label class="inline-flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="numbers" name="numbers" />
+          <span>Include Numbers</span>
+        </label>
+        <label class="inline-flex items-center space-x-2 cursor-pointer">
+          <input type="checkbox" id="symbols" name="symbols" />
+          <span>Include Symbols</span>
+        </label>
+      </fieldset>
+      <div id="optionDesc" class="sr-only">Select which character types to include in generated password</div>
+
+      <button 
+        type="submit"
+        aria-disabled="true"
+        id="generateBtn"
+        class="w-full bg-green-400 hover:bg-green-500 transition-colors font-mono font-semibold text-black py-3 rounded-md disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        GENERATE →
+      </button>
+    </form>
+  </div>
+
+<script>
+  // Character sets for password generation
+  const charSets = {
+    uppercase: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    lowercase: "abcdefghijklmnopqrstuvwxyz",
+    numbers: "0123456789",
+    symbols: "!@#$%^&*()_+~\`|}{[]:;?><,./-="
+  };
+
+  // DOM elements
+  const lengthSlider = document.getElementById('lengthSlider');
+  const lengthValue = document.getElementById('lengthValue');
+  const uppercaseCheckbox = document.getElementById('uppercase');
+  const lowercaseCheckbox = document.getElementById('lowercase');
+  const numbersCheckbox = document.getElementById('numbers');
+  const symbolsCheckbox = document.getElementById('symbols');
+  const generateBtn = document.getElementById('generateBtn');
+  const passwordResult = document.getElementById('resultPassword');
+  const clipboardBtn = document.getElementById('clipboardBtn');
+  const form = document.getElementById('passwordForm');
+
+  // Update displayed length value and generate button enabled state
+  lengthSlider.addEventListener('input', () => {
+    const val = parseInt(lengthSlider.value);
+    lengthValue.textContent = val;
+    updateGenerateButtonState();
+  });
+
+  // Update generate button enabled state on checkbox change
+  [uppercaseCheckbox, lowercaseCheckbox, numbersCheckbox, symbolsCheckbox].forEach(box => {
+    box.addEventListener('change', () => {
+      updateGenerateButtonState();
+    });
+  });
+
+  function updateGenerateButtonState(){
+    // Enable button only if length > 0 and at least one checkbox is checked
+    const length = parseInt(lengthSlider.value);
+    const isAnyChecked = uppercaseCheckbox.checked || lowercaseCheckbox.checked || numbersCheckbox.checked || symbolsCheckbox.checked;
+    generateBtn.disabled = !(length > 0 && isAnyChecked);
+    generateBtn.setAttribute('aria-disabled', generateBtn.disabled);
+  }
+
+  // Generate password function
+  function generatePassword(length, options) {
+    let availableChars = "";
+    if(options.uppercase) availableChars += charSets.uppercase;
+    if(options.lowercase) availableChars += charSets.lowercase;
+    if(options.numbers) availableChars += charSets.numbers;
+    if(options.symbols) availableChars += charSets.symbols;
+
+    if(!availableChars) return "";
+
+    let password = "";
+    const charArr = availableChars.split('');
+    for(let i=0; i<length; i++) {
+      const randomIndex = Math.floor(Math.random() * charArr.length);
+      password += charArr[randomIndex];
+    }
+    return password;
+  }
+
+  // On form submit generate password and display
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+
+    const length = parseInt(lengthSlider.value);
+    const options = {
+      uppercase: uppercaseCheckbox.checked,
+      lowercase: lowercaseCheckbox.checked,
+      numbers: numbersCheckbox.checked,
+      symbols: symbolsCheckbox.checked
+    };
+
+    const generated = generatePassword(length, options);
+    passwordResult.textContent = generated || "\u00A0"; // &nbsp; if empty
+  });
+
+  // Clipboard copy functionality
+  clipboardBtn.addEventListener('click', () => {
+    const text = passwordResult.textContent.trim();
+    if(text.length) {
+      navigator.clipboard.writeText(text).then(() => {
+        // Provide temporary feedback after copy
+        clipboardBtn.textContent = "✔️";
+        setTimeout(() => {
+          clipboardBtn.textContent = "📋";
+        }, 1500);
+      }).catch(() => {
+        alert("Failed to copy password. Please copy manually.");
+      });
+    }
+  });
+
+  // Initialize states
+  lengthValue.textContent = lengthSlider.value;
+  updateGenerateButtonState();
+</script>
+
+</body>
+</html>
+
